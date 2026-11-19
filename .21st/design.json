@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "project": {
+    "name": "housing-opportunity-lab",
+    "productType": "premium real-estate data map",
+    "stack": ["Next.js", "React", "NAVER Maps JavaScript API v3"]
+  },
+  "sources": {
+    "tokens": [],
+    "components": [],
+    "assets": [],
+    "instructions": []
+  },
+  "design": {
+    "colorMode": "light",
+    "colors": {
+      "brand": "#167b68",
+      "past": "#d88328",
+      "surface": "#ffffff",
+      "ink": "#17231f"
+    },
+    "typography": {
+      "bodyMinimum": "12px",
+      "supportingMinimum": "11px",
+      "mapMarkerPrice": "14px",
+      "rendering": "high contrast, Korean-first map labels"
+    },
+    "spacing": {},
+    "radius": { "control": "7-12px", "panel": "15-20px" },
+    "shadows": { "overlay": "subtle, low-contrast" },
+    "motion": {},
+    "density": "compact"
+  },
+  "components": {
+    "installed": [],
+    "preferredPrimitives": [],
+    "patterns": []
+  },
+  "constraints": {
+    "must": [
+      "Keep map overlays compact and readable over every basemap style",
+      "Preserve keyboard focus, aria labels, and mobile touch targets",
+      "Keep map attribution visible"
+    ],
+    "avoid": [
+      "Decorative gradients and excessive glass effects",
+      "Controls that obscure price markers or the time slider"
+    ]
+  },
+  "decisions": [
+    {
+      "date": "2026-11-18",
+      "decision": "Superseded: the initial OpenFreeMap style switcher established the compact three-option control pattern later retained for NAVER Maps."
+    },
+    {
+      "date": "2026-11-18",
+      "decision": "Raise supporting copy to at least 11px, body controls to at least 12px, and render map labels in Korean-first single-language form with a stronger halo."
+    },
+    {
+      "date": "2026-11-18",
+      "decision": "Use NAVER Maps GL vector map as the primary basemap and expose Normal, Terrain, and Hybrid map types while preserving product overlays."
+    },
+    {
+      "date": "2026-11-18",
+      "decision": "Use white price chips with a restrained brand status dot for observed trades; render unpriced catalog apartments as compact neutral dots that expand on selection, and cluster dense views into circular count markers."
+    }
+  ],
+  "evidence": [],
+  "generatedAt": "2026-11-18T10:27:58.829Z"
+}
