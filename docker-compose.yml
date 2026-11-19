@@ -23,6 +23,8 @@ services:
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-housing_lab}
       HOUSING_LAB_DEMO_MODE: ${HOUSING_LAB_DEMO_MODE:-true}
       SEOUL_OPEN_DATA_KEY: ${SEOUL_OPEN_DATA_KEY:-}
+      MOLIT_API_KEY: ${MOLIT_API_KEY:-}
+      VWORLD_API_KEY: ${VWORLD_API_KEY:-}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
     ports: ["${API_PORT:-18080}:8080"]
     depends_on:
