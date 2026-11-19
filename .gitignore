@@ -10,3 +10,4 @@ data/
 coverage/
 .playwright-cli/
 output/
+deploy/

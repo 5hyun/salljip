@@ -39,7 +39,7 @@ deploy/deploy-db.sh    # DB만 (데이터는 볼륨에 유지)
 deploy/status.sh       # 상태, `deploy/status.sh logs api` 로그
 ```
 
-현재 작업 트리를 rsync로 서버 `~/apps/housing-opportunity-lab`에 올린 뒤 서버에서 `docker compose up -d --build`를 실행합니다. 서버 설정은 서버의 `.env`(템플릿: `deploy/server.env.example`)에만 있고 동기화되지 않습니다. 웹 http://192.168.0.10:13000, API http://192.168.0.10:18080.
+현재 작업 트리를 rsync로 서버 `~/apps/salljip`에 올린 뒤 서버에서 `docker compose up -d --build`를 실행합니다. 서버 설정은 서버의 `.env`(템플릿: `deploy/server.env.example`)에만 있고 동기화되지 않습니다. 웹 http://192.168.0.10:13000, API http://192.168.0.10:18080.
 
 ## 검증
 
