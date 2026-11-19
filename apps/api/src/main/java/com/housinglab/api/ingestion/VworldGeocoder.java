@@ -25,7 +25,9 @@ public class VworldGeocoder {
 
   public enum AddressType { PARCEL, ROAD }
 
-  private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+  // 브이월드는 HTTP/2 연속 호출 중 스트림을 끊는 경우가 있어(RST_STREAM) HTTP/1.1로 고정한다.
+  private final HttpClient http = HttpClient.newBuilder()
+      .version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(10)).build();
   private final String apiKey;
 
   public VworldGeocoder(@Value("${housing-lab.vworld.api-key:}") String apiKey) { this.apiKey = apiKey.trim(); }

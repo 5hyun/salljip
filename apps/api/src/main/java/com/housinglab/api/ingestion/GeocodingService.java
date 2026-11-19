@@ -32,12 +32,21 @@ public class GeocodingService {
         (rs, i) -> new Pending(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5)),
         regionCode);
     log.info("지오코딩 대상 {}곳", pending.size());
-    int ok = 0, missing = 0;
+    int ok = 0, missing = 0, consecutiveErrors = 0;
     for (var building : pending) {
-      var point = building.jibun() == null ? java.util.Optional.<VworldGeocoder.Point>empty()
-          : geocoder.geocode(building.region() + " " + building.umd() + " " + building.jibun(), VworldGeocoder.AddressType.PARCEL);
-      if (point.isEmpty() && building.road() != null) {
-        point = geocoder.geocode(building.region() + " " + building.road(), VworldGeocoder.AddressType.ROAD);
+      java.util.Optional<VworldGeocoder.Point> point;
+      try {
+        point = building.jibun() == null ? java.util.Optional.empty()
+            : geocoder.geocode(building.region() + " " + building.umd() + " " + building.jibun(), VworldGeocoder.AddressType.PARCEL);
+        if (point.isEmpty() && building.road() != null) {
+          point = geocoder.geocode(building.region() + " " + building.road(), VworldGeocoder.AddressType.ROAD);
+        }
+        consecutiveErrors = 0;
+      } catch (IllegalStateException e) {
+        // 일시 오류는 PENDING으로 남겨 다음 실행에서 다시 시도한다. 연속 실패(키·한도 문제)면 중단.
+        log.warn("지오코딩 실패({}): {}", building.id(), e.getMessage());
+        if (++consecutiveErrors >= 10) throw e;
+        continue;
       }
       if (point.isPresent()) {
         jdbc.update("UPDATE buildings SET location = ST_SetSRID(ST_MakePoint(?, ?), 4326), geocode_status = 'OK' WHERE id = CAST(? AS UUID)",
