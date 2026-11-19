@@ -57,17 +57,24 @@ public class JdbcCatalog {
 
   public Map<String, BuildingSales> latestSales(
       String regionCode, BigDecimal areaMin, BigDecimal areaMax, long priceMin, long priceMax) {
+    // 지역 전체 거래를 윈도 함수로 정렬하면 수십만 건을 디스크 정렬하게 되어 느리다.
+    // 건물별 개수는 GROUP BY로 세고, 최신 2건은 idx_trades_building_date로 건물마다 바로 꺼낸다.
     var rows = jdbc.query("""
-        SELECT * FROM (
-          SELECT %s,
-                 ROW_NUMBER() OVER (PARTITION BY t.building_id ORDER BY t.contract_date DESC, t.id) AS rn,
-                 COUNT(*) OVER (PARTITION BY t.building_id) AS cnt
-            FROM trades t
-           WHERE t.region_code = ? AND t.canceled_at IS NULL AND t.building_id IS NOT NULL
-             AND t.exclusive_area_m2 BETWEEN ? AND ? AND t.price_krw BETWEEN ? AND ?
-        ) ranked WHERE rn <= 2 ORDER BY building_id, rn""".formatted(TRADE_COLUMNS),
+        SELECT g.cnt, %s
+          FROM (SELECT building_id, COUNT(*) AS cnt
+                  FROM trades
+                 WHERE region_code = ? AND canceled_at IS NULL AND building_id IS NOT NULL
+                   AND exclusive_area_m2 BETWEEN ? AND ? AND price_krw BETWEEN ? AND ?
+                 GROUP BY building_id) g
+         CROSS JOIN LATERAL (
+                SELECT * FROM trades t
+                 WHERE t.building_id = g.building_id AND t.canceled_at IS NULL
+                   AND t.exclusive_area_m2 BETWEEN ? AND ? AND t.price_krw BETWEEN ? AND ?
+                 ORDER BY t.contract_date DESC, t.id
+                 LIMIT 2) t
+         ORDER BY g.building_id, t.contract_date DESC, t.id""".formatted(TRADE_COLUMNS),
         (rs, i) -> new Object[] {trade(rs, i), rs.getInt("cnt")},
-        regionCode, areaMin, areaMax, priceMin, priceMax);
+        regionCode, areaMin, areaMax, priceMin, priceMax, areaMin, areaMax, priceMin, priceMax);
     var grouped = new HashMap<String, List<Object[]>>();
     rows.forEach(row -> grouped.computeIfAbsent(((Trade) row[0]).buildingId(), key -> new ArrayList<>()).add(row));
     var result = new HashMap<String, BuildingSales>();

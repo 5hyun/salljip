@@ -255,14 +255,21 @@ export default function MapExplorer() {
     }));
   }, [mode, visibleCandidates, visibleListings]);
 
+  // 새 조회가 시작되면 이전 조회를 취소한다. 늦게 도착한 옛 응답이 최신 마커를 덮어쓰지 않게 한다.
+  const currentRequestRef = useRef<AbortController | null>(null);
   const loadCurrent = useCallback((nextFilters: MapFilters, bbox?: string) => {
+    currentRequestRef.current?.abort();
+    const controller = new AbortController();
+    currentRequestRef.current = controller;
     startTransition(async () => {
       try {
-        const data = await getMapListings(nextFilters, bbox);
+        const data = await getMapListings(nextFilters, bbox, controller.signal);
+        if (controller.signal.aborted) return;
         setListings(data);
         setError(null);
         setSelectedId((current) => data.some((item) => item.building.id === current) ? current : data[0]?.building.id ?? null);
       } catch (cause) {
+        if (controller.signal.aborted) return;
         setError(cause instanceof Error ? `${cause.message} 조건을 확인하고 다시 시도해 주세요.` : "현재 지도 데이터를 불러오지 못했습니다. 다시 시도해 주세요.");
       }
     });
