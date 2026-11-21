@@ -14,7 +14,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -23,7 +22,6 @@ import org.springframework.stereotype.Component;
  * 지도에 올릴 수 있도록 좌표가 확보된 건물만 반환한다. 전월세는 아직 수집하지 않는다.
  */
 @Component
-@ConditionalOnProperty(name = "housing-lab.demo-mode", havingValue = "false")
 public class JdbcCatalog {
   private static final String BUILDING_SQL = """
       SELECT b.id, b.region_code, b.property_type, b.canonical_name,
@@ -41,6 +39,15 @@ public class JdbcCatalog {
   /** 건물별 최신·직전 매매와 조건에 맞는 거래 수. */
   public record BuildingSales(Trade latest, Trade previous, int count) {}
 
+  /** 시·군·구 목록. 상위명은 이름의 첫 단어(예: 서울특별시)다. */
+  public List<Region> regions() {
+    return jdbc.query("SELECT region_code, name FROM regions ORDER BY region_code", (rs, i) -> {
+      String name = rs.getString("name");
+      int space = name.indexOf(' ');
+      return new Region(rs.getString("region_code"), name, space < 0 ? name : name.substring(0, space));
+    });
+  }
+
   public List<Building> buildings(Collection<String> regionCodes) {
     if (regionCodes == null || regionCodes.isEmpty()) return jdbc.query(BUILDING_SQL, JdbcCatalog::building);
     return jdbc.query(BUILDING_SQL + " AND b.region_code = ANY (?)", JdbcCatalog::building, (Object) textArray(regionCodes));
@@ -57,17 +64,24 @@ public class JdbcCatalog {
 
   public Map<String, BuildingSales> latestSales(
       String regionCode, BigDecimal areaMin, BigDecimal areaMax, long priceMin, long priceMax) {
+    // 지역 전체 거래를 윈도 함수로 정렬하면 수십만 건을 디스크 정렬하게 되어 느리다.
+    // 건물별 개수는 GROUP BY로 세고, 최신 2건은 idx_trades_building_date로 건물마다 바로 꺼낸다.
     var rows = jdbc.query("""
-        SELECT * FROM (
-          SELECT %s,
-                 ROW_NUMBER() OVER (PARTITION BY t.building_id ORDER BY t.contract_date DESC, t.id) AS rn,
-                 COUNT(*) OVER (PARTITION BY t.building_id) AS cnt
-            FROM trades t
-           WHERE t.region_code = ? AND t.canceled_at IS NULL AND t.building_id IS NOT NULL
-             AND t.exclusive_area_m2 BETWEEN ? AND ? AND t.price_krw BETWEEN ? AND ?
-        ) ranked WHERE rn <= 2 ORDER BY building_id, rn""".formatted(TRADE_COLUMNS),
+        SELECT g.cnt, %s
+          FROM (SELECT building_id, COUNT(*) AS cnt
+                  FROM trades
+                 WHERE region_code = ? AND canceled_at IS NULL AND building_id IS NOT NULL
+                   AND exclusive_area_m2 BETWEEN ? AND ? AND price_krw BETWEEN ? AND ?
+                 GROUP BY building_id) g
+         CROSS JOIN LATERAL (
+                SELECT * FROM trades t
+                 WHERE t.building_id = g.building_id AND t.canceled_at IS NULL
+                   AND t.exclusive_area_m2 BETWEEN ? AND ? AND t.price_krw BETWEEN ? AND ?
+                 ORDER BY t.contract_date DESC, t.id
+                 LIMIT 2) t
+         ORDER BY g.building_id, t.contract_date DESC, t.id""".formatted(TRADE_COLUMNS),
         (rs, i) -> new Object[] {trade(rs, i), rs.getInt("cnt")},
-        regionCode, areaMin, areaMax, priceMin, priceMax);
+        regionCode, areaMin, areaMax, priceMin, priceMax, areaMin, areaMax, priceMin, priceMax);
     var grouped = new HashMap<String, List<Object[]>>();
     rows.forEach(row -> grouped.computeIfAbsent(((Trade) row[0]).buildingId(), key -> new ArrayList<>()).add(row));
     var result = new HashMap<String, BuildingSales>();

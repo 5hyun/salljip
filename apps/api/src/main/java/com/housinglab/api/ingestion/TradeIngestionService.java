@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -22,7 +21,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 같은 달을 다시 받아도 중복되지 않고, 해제 여부가 바뀐 거래만 새 버전으로 기록한다.
  */
 @Service
-@ConditionalOnProperty(name = "housing-lab.demo-mode", havingValue = "false")
 public class TradeIngestionService {
   private static final Logger log = LoggerFactory.getLogger(TradeIngestionService.class);
   private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");

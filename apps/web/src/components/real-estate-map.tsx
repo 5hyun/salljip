@@ -148,6 +148,8 @@ export default function RealEstateMap({
 
       const reportViewport = () => {
         const bounds = map.getBounds() as naver.maps.LatLngBounds;
+        // 지도 크기가 잡히기 전에는 영역이 한 점이라, 그대로 조회하면 빈 결과가 마커를 지운다.
+        if (bounds.west() === bounds.east() || bounds.south() === bounds.north()) return;
         const center = map.getCenter() as naver.maps.LatLng;
         if (process.env.NODE_ENV !== "production") {
           console.log(`[map] zoom=${map.getZoom()} center=${center.lat().toFixed(6)},${center.lng().toFixed(6)}`);

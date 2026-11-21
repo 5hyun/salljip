@@ -224,9 +224,7 @@ export default function MapExplorer() {
   const selectedListing = listings.find((listing) => listing.building.id === selectedId) ?? null;
   const selectedCandidate = candidates.find((candidate) => candidate.building.id === selectedId) ?? null;
   const selectedBuilding = mode === "CURRENT" ? selectedListing?.building : selectedCandidate?.building;
-  const usesRealTrades = listings.some((listing) => listing.sourceStatus === "PUBLIC_ALLOWED");
-  const usesOfficialCatalog = !usesRealTrades && listings.some((listing) => listing.sourceStatus === "NO_MATCHING_TRADE");
-  const realDataAsOf = listings.find((listing) => listing.sourceStatus === "PUBLIC_ALLOWED")?.dataAsOf;
+  const realDataAsOf = listings.find((listing) => listing.dataAsOf)?.dataAsOf;
 
   const markers = useMemo<MapMarkerItem[]>(() => {
     if (mode === "CURRENT") {
@@ -255,14 +253,21 @@ export default function MapExplorer() {
     }));
   }, [mode, visibleCandidates, visibleListings]);
 
+  // 새 조회가 시작되면 이전 조회를 취소한다. 늦게 도착한 옛 응답이 최신 마커를 덮어쓰지 않게 한다.
+  const currentRequestRef = useRef<AbortController | null>(null);
   const loadCurrent = useCallback((nextFilters: MapFilters, bbox?: string) => {
+    currentRequestRef.current?.abort();
+    const controller = new AbortController();
+    currentRequestRef.current = controller;
     startTransition(async () => {
       try {
-        const data = await getMapListings(nextFilters, bbox);
+        const data = await getMapListings(nextFilters, bbox, controller.signal);
+        if (controller.signal.aborted) return;
         setListings(data);
         setError(null);
         setSelectedId((current) => data.some((item) => item.building.id === current) ? current : data[0]?.building.id ?? null);
       } catch (cause) {
+        if (controller.signal.aborted) return;
         setError(cause instanceof Error ? `${cause.message} 조건을 확인하고 다시 시도해 주세요.` : "현재 지도 데이터를 불러오지 못했습니다. 다시 시도해 주세요.");
       }
     });
@@ -390,7 +395,7 @@ export default function MapExplorer() {
         <button type="button" className={mode === "PAST" ? "active" : ""} aria-pressed={mode === "PAST"} onClick={() => switchMode("PAST")}><History size={15} aria-hidden="true" />그때라면</button>
       </div>
       <div className="header-context">
-        <span className="demo-status"><i /> {usesRealTrades ? "국토교통부 실거래" : usesOfficialCatalog ? "서울시 단지 정보" : "합성 데모 데이터"}</span>
+        <span className="data-status"><i /> 국토교통부 실거래</span>
         <button type="button" className="mobile-filter-button" onClick={() => setFilterOpen(true)} aria-label="찾는 조건 열기"><SlidersHorizontal size={16} aria-hidden="true" /><span>조건</span></button>
       </div>
     </header>
@@ -491,7 +496,7 @@ export default function MapExplorer() {
         <button type="button" className="detail-close" onClick={() => setDetailOpen(false)} aria-label="상세 패널 닫기"><X size={19} aria-hidden="true" /></button>
         {!selectedBuilding ? <div className="detail-placeholder"><span><MapPin size={22} aria-hidden="true" /></span><h2>마음에 드는 단지를 눌러보세요</h2><p>지도 위 가격표를 누르면 최근 거래와 가격 흐름을 보여드려요.</p></div> : <>
           <div className="detail-hero">
-            <div className="detail-tags">{selectedBuilding.propertyType ? <span>{PROPERTY_TYPE_LABEL[selectedBuilding.propertyType]}</span> : null}<span>{mode === "PAST" ? `${historyForm.date.replace("-", ".")} 관측` : "최신 관측"}</span><span className="source-tag"><ShieldCheck size={11} aria-hidden="true" /> {usesRealTrades ? "국토교통부 실거래" : "데모 출처"}</span></div>
+            <div className="detail-tags">{selectedBuilding.propertyType ? <span>{PROPERTY_TYPE_LABEL[selectedBuilding.propertyType]}</span> : null}<span>{mode === "PAST" ? `${historyForm.date.replace("-", ".")} 관측` : "최신 관측"}</span><span className="source-tag"><ShieldCheck size={11} aria-hidden="true" /> 국토교통부 실거래</span></div>
             <h2>{selectedBuilding.name}</h2>
             <p><MapPin size={13} aria-hidden="true" /> {selectedBuilding.address}</p>
             <div className="building-facts"><span><b>{selectedBuilding.households > 0 ? fullMoney.format(selectedBuilding.households) : "-"}</b>세대</span><span><b>{selectedBuilding.builtYear > 0 ? selectedBuilding.builtYear : "-"}</b>년 준공</span><span><b>{selectedBuilding.builtYear > 0 ? 2026 - selectedBuilding.builtYear : "-"}</b>년차</span></div>
@@ -537,7 +542,7 @@ export default function MapExplorer() {
           </section>
 
           {mode === "PAST" ? <div className="data-caution"><CircleAlert size={16} aria-hidden="true" /><p><strong>알아두세요</strong>그때 예산 안에서 거래가 신고됐다는 뜻이에요. 당시 실제로 매물이 있었는지, 대출이 됐을지는 보장하지 않아요.</p></div> : null}
-          <div className="data-footnote"><ShieldCheck size={14} aria-hidden="true" /><span>{usesRealTrades ? `기준일 ${realDataAsOf ?? ""} · 출처: 국토교통부 실거래가 공개시스템(공공데이터포털) · 위치: 브이월드 지오코더 · 매매만 제공` : usesOfficialCatalog ? "단지 위치·기본정보: 서울 열린데이터광장 · 가격: 관측 데이터가 있는 단지만 표시" : `기준일 ${dateFormatter.format(new Date("2026-11-17T00:00:00+09:00"))} · 국토교통부 형식 합성 데이터`}<br />거래가 없으면 가격을 짐작해서 채우지 않고 “기록 부족”으로 보여드려요.</span></div>
+          <div className="data-footnote"><ShieldCheck size={14} aria-hidden="true" /><span>{`기준일 ${realDataAsOf ?? ""} · 출처: 국토교통부 실거래가 공개시스템(공공데이터포털) · 위치: 브이월드 지오코더 · 매매만 제공`}<br />거래가 없으면 가격을 짐작해서 채우지 않고 “기록 부족”으로 보여드려요.</span></div>
         </>}
       </aside> : null}
     </main>

@@ -124,8 +124,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .mode-switch button.active { color: var(--ink); background: var(--surface); box-shadow: var(--shadow-sm); }
 .mode-switch button.active svg { color: var(--accent); }
 .header-context { justify-self: end; display: flex; align-items: center; gap: 10px; }
-.demo-status { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 999px; color: var(--ink-3); background: var(--fill); font-size: 13px; font-weight: 600; }
-.demo-status i { width: 7px; height: 7px; border-radius: 50%; background: #ffb020; }
+.data-status { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 999px; color: var(--ink-3); background: var(--fill); font-size: 13px; font-weight: 600; }
+.data-status i { width: 7px; height: 7px; border-radius: 50%; background: #22a06b; }
 .mobile-filter-button { display: none; }
 
 /* ── 작업 영역: 왼쪽 사이드바 + 지도 + 떠 있는 상세 카드 ───────── */
@@ -555,7 +555,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   .map-header { grid-template-columns: auto 1fr auto; gap: 10px; padding: 0 14px; }
   .map-brand-mark { width: 32px; height: 32px; }
   .map-brand strong { font-size: 19px; }
-  .demo-status { display: none; }
+  .data-status { display: none; }
   .mode-switch { justify-self: end; }
   .mode-switch button { min-width: 0; height: 36px; padding: 0 12px; font-size: 14px; }
   .mode-switch button svg { display: none; }

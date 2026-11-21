@@ -3,13 +3,12 @@ package com.housinglab.api.catalog;
 import static com.housinglab.api.catalog.CatalogModels.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -18,20 +17,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/map")
 public class MapController {
-  private final DemoCatalog catalog;
-  private final ApartmentCatalogService apartmentCatalog;
-  /** 실데이터 모드(housing-lab.demo-mode=false)에서만 존재한다. */
-  private final JdbcCatalog realCatalog;
+  private final JdbcCatalog catalog;
 
-  public MapController(DemoCatalog catalog, ApartmentCatalogService apartmentCatalog) {
-    this(catalog, apartmentCatalog, Optional.empty());
-  }
-
-  @Autowired
-  public MapController(DemoCatalog catalog, ApartmentCatalogService apartmentCatalog, Optional<JdbcCatalog> realCatalog) {
+  public MapController(JdbcCatalog catalog) {
     this.catalog = catalog;
-    this.apartmentCatalog = apartmentCatalog;
-    this.realCatalog = realCatalog.orElse(null);
   }
 
   @GetMapping("/apartments")
@@ -51,25 +40,18 @@ public class MapController {
     if (priceMin > priceMax) throw new IllegalArgumentException("최소 가격은 최대 가격보다 작아야 합니다.");
     if (areaMin.compareTo(areaMax) > 0) throw new IllegalArgumentException("최소 면적은 최대 면적보다 작아야 합니다.");
 
-    var bounds = parseBounds(bbox);
-    if (realCatalog != null) return realListings(regionCode, normalizedType, priceMin, priceMax, areaMin, areaMax, includeUnpriced, bounds);
-    return apartmentCatalog.buildings(regionCode).stream()
-        .filter(building -> bounds == null || withinBounds(building, bounds))
-        .map(building -> listing(building, normalizedType, priceMin, priceMax, areaMin, areaMax, includeUnpriced))
-        .filter(listing -> listing != null)
-        .sorted(Comparator.comparing((MapListing listing) -> listing.latestTrade() == null))
-        .toList();
+    return listings(regionCode, normalizedType, priceMin, priceMax, areaMin, areaMax, includeUnpriced, parseBounds(bbox));
   }
 
   /** 국토교통부 매매 실거래(PostGIS). 전월세는 아직 수집하지 않아 가격 없는 건물로만 표시된다. */
-  private List<MapListing> realListings(
+  private List<MapListing> listings(
       String regionCode, String type, long priceMin, long priceMax,
       BigDecimal areaMin, BigDecimal areaMax, boolean includeUnpriced, double[] bounds) {
     var sales = "SALE".equals(type)
-        ? realCatalog.latestSales(regionCode, areaMin, areaMax, priceMin, priceMax)
-        : java.util.Map.<String, JdbcCatalog.BuildingSales>of();
-    String asOf = realCatalog.dataAsOf().atZone(java.time.ZoneId.of("Asia/Seoul")).toLocalDate().toString();
-    return realCatalog.buildings(List.of(regionCode)).stream()
+        ? catalog.latestSales(regionCode, areaMin, areaMax, priceMin, priceMax)
+        : Map.<String, JdbcCatalog.BuildingSales>of();
+    String asOf = catalog.dataAsOf().atZone(ZoneId.of("Asia/Seoul")).toLocalDate().toString();
+    return catalog.buildings(List.of(regionCode)).stream()
         .filter(building -> bounds == null || withinBounds(building, bounds))
         .map(building -> {
           var sale = sales.get(building.id());
@@ -99,32 +81,5 @@ public class MapController {
   private boolean withinBounds(Building building, double[] bounds) {
     return building.longitude() >= bounds[0] && building.longitude() <= bounds[2]
         && building.latitude() >= bounds[1] && building.latitude() <= bounds[3];
-  }
-
-  private MapListing listing(
-      Building building,
-      String type,
-      long priceMin,
-      long priceMax,
-      BigDecimal areaMin,
-      BigDecimal areaMax,
-      boolean includeUnpriced) {
-    var observations = catalog.trades().stream()
-        .filter(trade -> !trade.canceled())
-        .filter(trade -> trade.buildingId().equals(building.id()))
-        .filter(trade -> trade.transactionType().equals(type))
-        .filter(trade -> trade.areaM2().compareTo(areaMin) >= 0 && trade.areaM2().compareTo(areaMax) <= 0)
-        .filter(trade -> trade.priceKrw() >= priceMin && trade.priceKrw() <= priceMax)
-        .sorted(Comparator.comparing(Trade::contractDate).reversed())
-        .toList();
-    if (observations.isEmpty()) {
-      return includeUnpriced
-          ? new MapListing(building, null, null, 0, LocalDate.now().toString(), "NO_MATCHING_TRADE")
-          : null;
-    }
-    var latest = observations.getFirst();
-    var previous = observations.size() > 1 ? observations.get(1) : null;
-    return new MapListing(building, latest, previous, observations.size(),
-        LocalDate.of(2026, 11, 17).toString(), "INTERNAL_TEST");
   }
 }
