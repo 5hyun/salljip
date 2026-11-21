@@ -1,5 +1,7 @@
 package com.housinglab.api.ingestion;
 
+import com.housinglab.api.usage.ApiProvider;
+import com.housinglab.api.usage.ApiUsageRecorder;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -29,8 +31,12 @@ public class VworldGeocoder {
   private final HttpClient http = HttpClient.newBuilder()
       .version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(10)).build();
   private final String apiKey;
+  private final ApiUsageRecorder usage;
 
-  public VworldGeocoder(@Value("${housing-lab.vworld.api-key:}") String apiKey) { this.apiKey = apiKey.trim(); }
+  public VworldGeocoder(@Value("${housing-lab.vworld.api-key:}") String apiKey, ApiUsageRecorder usage) {
+    this.apiKey = apiKey.trim();
+    this.usage = usage;
+  }
 
   public boolean configured() { return !apiKey.isBlank(); }
 
@@ -42,7 +48,14 @@ public class VworldGeocoder {
         + "&address=" + URLEncoder.encode(address, StandardCharsets.UTF_8)
         + "&key=" + URLEncoder.encode(apiKey, StandardCharsets.UTF_8));
     String body = send(HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(20)).GET().build());
-    return parse(body);
+    try {
+      var point = parse(body);
+      usage.success(ApiProvider.VWORLD);
+      return point;
+    } catch (IllegalStateException e) {
+      usage.failure(ApiProvider.VWORLD); // 키·한도 오류도 HTTP 200으로 온다.
+      throw e;
+    }
   }
 
   static Optional<Point> parse(String body) {
@@ -64,8 +77,10 @@ public class VworldGeocoder {
       try {
         var response = http.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         if (response.statusCode() == 200) return response.body();
+        usage.failure(ApiProvider.VWORLD);
         if (attempt >= 3) throw new IllegalStateException("브이월드 HTTP " + response.statusCode());
       } catch (IOException e) {
+        usage.failure(ApiProvider.VWORLD);
         if (attempt >= 3) throw new IllegalStateException("브이월드 호출 실패: " + e.getMessage());
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();

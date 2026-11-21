@@ -3,6 +3,8 @@ package com.housinglab.api.catalog;
 import static com.housinglab.api.catalog.CatalogModels.Building;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.housinglab.api.usage.ApiProvider;
+import com.housinglab.api.usage.ApiUsageRecorder;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -25,13 +27,16 @@ public class ApartmentCatalogService {
   private final DemoCatalog demoCatalog;
   private final RestClient restClient;
   private final String apiKey;
+  private final ApiUsageRecorder usage;
   private volatile List<Building> cachedNowon = List.of();
   private volatile Instant cachedAt = Instant.EPOCH;
 
   public ApartmentCatalogService(
       DemoCatalog demoCatalog,
-      @Value("${seoul.open-data-key:}") String apiKey) {
+      @Value("${seoul.open-data-key:}") String apiKey,
+      ApiUsageRecorder usage) {
     this.demoCatalog = demoCatalog;
+    this.usage = usage;
     this.restClient = RestClient.builder().baseUrl("http://openapi.seoul.go.kr:8088").build();
     this.apiKey = apiKey.trim();
   }
@@ -76,13 +81,21 @@ public class ApartmentCatalogService {
   }
 
   private JsonNode fetchPage(int start, int end) {
-    var response = restClient.get()
-        .uri("/{key}/json/OpenAptInfo/{start}/{end}/", apiKey, start, end)
-        .retrieve()
-        .body(JsonNode.class);
+    JsonNode response;
+    try {
+      response = restClient.get()
+          .uri("/{key}/json/OpenAptInfo/{start}/{end}/", apiKey, start, end)
+          .retrieve()
+          .body(JsonNode.class);
+    } catch (RuntimeException e) {
+      usage.failure(ApiProvider.SEOUL_OPEN_DATA);
+      throw e;
+    }
     if (response == null || !response.has("OpenAptInfo")) {
+      usage.failure(ApiProvider.SEOUL_OPEN_DATA);
       throw new IllegalStateException("서울시 공동주택 데이터를 불러오지 못했습니다.");
     }
+    usage.success(ApiProvider.SEOUL_OPEN_DATA);
     return response.path("OpenAptInfo");
   }
 

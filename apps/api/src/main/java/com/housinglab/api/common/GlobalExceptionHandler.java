@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,6 +33,12 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(HttpMessageNotReadableException.class)
   ResponseEntity<ApiError> unreadable(HttpMessageNotReadableException exception, HttpServletRequest request) {
     return error(HttpStatus.BAD_REQUEST, "MALFORMED_JSON", "요청 JSON 필드와 형식을 확인해 주세요.", request);
+  }
+
+  @ExceptionHandler(ResponseStatusException.class)
+  ResponseEntity<ApiError> status(ResponseStatusException exception, HttpServletRequest request) {
+    var status = HttpStatus.valueOf(exception.getStatusCode().value());
+    return error(status, status.name(), exception.getReason(), request);
   }
 
   @ExceptionHandler(Exception.class)

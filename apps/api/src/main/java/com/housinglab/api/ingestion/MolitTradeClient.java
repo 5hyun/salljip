@@ -1,5 +1,7 @@
 package com.housinglab.api.ingestion;
 
+import com.housinglab.api.usage.ApiProvider;
+import com.housinglab.api.usage.ApiUsageRecorder;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -22,12 +24,15 @@ public class MolitTradeClient {
   private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
   private final String baseUrl;
   private final String serviceKey;
+  private final ApiUsageRecorder usage;
 
   public MolitTradeClient(
       @Value("${housing-lab.molit.base-url}") String baseUrl,
-      @Value("${housing-lab.molit.api-key:}") String serviceKey) {
+      @Value("${housing-lab.molit.api-key:}") String serviceKey,
+      ApiUsageRecorder usage) {
     this.baseUrl = baseUrl;
     this.serviceKey = serviceKey;
+    this.usage = usage;
   }
 
   public boolean configured() { return !serviceKey.isBlank(); }
@@ -44,10 +49,20 @@ public class MolitTradeClient {
     for (int attempt = 1; ; attempt++) {
       try {
         var response = http.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        if (response.statusCode() != 200) usage.failure(ApiProvider.MOLIT);
         if (response.statusCode() >= 500 && attempt < 3) { pause(attempt); continue; }
         if (response.statusCode() != 200) throw new MolitApiException("HTTP" + response.statusCode(), type.datasetId() + " 호출 실패");
-        return MolitResponseParser.parse(response.body());
+        MolitResponseParser.Page result;
+        try {
+          result = MolitResponseParser.parse(response.body());
+        } catch (MolitApiException e) {
+          usage.failure(ApiProvider.MOLIT); // 키 미등록·트래픽 초과도 HTTP 200으로 온다.
+          throw e;
+        }
+        usage.success(ApiProvider.MOLIT);
+        return result;
       } catch (IOException e) {
+        usage.failure(ApiProvider.MOLIT);
         if (attempt >= 3) throw new MolitApiException("IO", type.datasetId() + " 호출 실패: " + e.getMessage());
         pause(attempt);
       } catch (InterruptedException e) {

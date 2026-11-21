@@ -3,13 +3,14 @@ package com.housinglab.api.catalog;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.housinglab.api.usage.ApiUsageRecorder;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 
 class MapControllerTest {
   private final DemoCatalog catalog = new DemoCatalog();
   private final MapController controller = new MapController(
-      catalog, new ApartmentCatalogService(catalog, ""));
+      catalog, new ApartmentCatalogService(catalog, "", ApiUsageRecorder.disabled()));
 
   @Test
   void returnsCurrentSaleListingsForNowon() {
