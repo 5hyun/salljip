@@ -2,13 +2,11 @@ package com.housinglab.api.ingestion;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 /** 좌표가 없는 건물을 지번(없으면 도로명) 주소로 지오코딩해 buildings.location 을 채운다. */
 @Service
-@ConditionalOnProperty(name = "housing-lab.demo-mode", havingValue = "false")
 public class GeocodingService {
   private static final Logger log = LoggerFactory.getLogger(GeocodingService.class);
 

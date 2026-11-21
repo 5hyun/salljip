@@ -12,7 +12,7 @@ public final class CatalogModels {
   public record Building(
       String id, String regionCode, String name, String address,
       double longitude, double latitude, int households, int builtYear, String propertyType) {
-    /** 유형을 모르는 원천(서울시 공동주택, 데모)은 아파트로 본다. */
+    /** 유형을 모르면 아파트로 본다. */
     public Building(String id, String regionCode, String name, String address,
         double longitude, double latitude, int households, int builtYear) {
       this(id, regionCode, name, address, longitude, latitude, households, builtYear, "APT");

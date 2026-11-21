@@ -5,8 +5,6 @@ import static com.housinglab.api.catalog.CatalogModels.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Locale;
-import java.util.Optional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -15,14 +13,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1")
 public class CatalogController {
-  private final DemoCatalog catalog;
+  private final JdbcCatalog catalog;
 
-  /** 실데이터 모드(housing-lab.demo-mode=false)에서만 존재한다. */
-  private final JdbcCatalog realCatalog;
-
-  public CatalogController(DemoCatalog catalog, Optional<JdbcCatalog> realCatalog) {
+  public CatalogController(JdbcCatalog catalog) {
     this.catalog = catalog;
-    this.realCatalog = realCatalog.orElse(null);
   }
 
   @GetMapping("/regions")
@@ -36,11 +30,7 @@ public class CatalogController {
       @RequestParam(required = false) String regionCode,
       @RequestParam(defaultValue = "12") int zoom) {
     var bounds = parseBounds(bbox);
-    var source = realCatalog != null
-        ? realCatalog.buildings(regionCode == null ? List.of() : List.of(regionCode))
-        : catalog.buildings();
-    return source.stream()
-        .filter(building -> regionCode == null || regionCode.equals(building.regionCode()))
+    return catalog.buildings(regionCode == null ? List.of() : List.of(regionCode)).stream()
         .filter(building -> bounds == null || withinBounds(building, bounds))
         .toList();
   }
@@ -52,18 +42,10 @@ public class CatalogController {
       @RequestParam(required = false) LocalDate from,
       @RequestParam(required = false) LocalDate to,
       @RequestParam(required = false) BigDecimal areaMin) {
-    if (realCatalog != null && JdbcCatalog.isDatabaseId(buildingId)) {
-      // 실데이터는 매매만 수집한다.
-      if (transactionType != null && !"SALE".equalsIgnoreCase(transactionType)) return List.of();
-      return realCatalog.tradesForBuilding(buildingId, from, to, areaMin);
-    }
-    return catalog.trades().stream()
-        .filter(trade -> trade.buildingId().equals(buildingId) && !trade.canceled())
-        .filter(trade -> transactionType == null || transactionType.toUpperCase(Locale.ROOT).equals(trade.transactionType()))
-        .filter(trade -> from == null || !trade.contractDate().isBefore(from))
-        .filter(trade -> to == null || !trade.contractDate().isAfter(to))
-        .filter(trade -> areaMin == null || trade.areaM2().compareTo(areaMin) >= 0)
-        .toList();
+    if (!JdbcCatalog.isDatabaseId(buildingId)) return List.of();
+    // 실거래는 매매만 수집한다.
+    if (transactionType != null && !"SALE".equalsIgnoreCase(transactionType)) return List.of();
+    return catalog.tradesForBuilding(buildingId, from, to, areaMin);
   }
 
   private double[] parseBounds(String bbox) {

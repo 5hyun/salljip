@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * 일회성 수집 실행. 예:
- * {@code java -jar app.jar --housing-lab.demo-mode=false --housing-lab.ingest.region=11350 --housing-lab.ingest.from=2006-01}
+ * {@code java -jar app.jar --housing-lab.ingest.region=11350 --housing-lab.ingest.from=2006-01}
  * 수집 후 좌표 없는 건물을 지오코딩하고({@code --housing-lab.ingest.geocode=false}로 끔) 프로세스를 종료한다.
  */
 @Component

@@ -14,7 +14,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -23,7 +22,6 @@ import org.springframework.stereotype.Component;
  * 지도에 올릴 수 있도록 좌표가 확보된 건물만 반환한다. 전월세는 아직 수집하지 않는다.
  */
 @Component
-@ConditionalOnProperty(name = "housing-lab.demo-mode", havingValue = "false")
 public class JdbcCatalog {
   private static final String BUILDING_SQL = """
       SELECT b.id, b.region_code, b.property_type, b.canonical_name,
@@ -40,6 +38,15 @@ public class JdbcCatalog {
 
   /** 건물별 최신·직전 매매와 조건에 맞는 거래 수. */
   public record BuildingSales(Trade latest, Trade previous, int count) {}
+
+  /** 시·군·구 목록. 상위명은 이름의 첫 단어(예: 서울특별시)다. */
+  public List<Region> regions() {
+    return jdbc.query("SELECT region_code, name FROM regions ORDER BY region_code", (rs, i) -> {
+      String name = rs.getString("name");
+      int space = name.indexOf(' ');
+      return new Region(rs.getString("region_code"), name, space < 0 ? name : name.substring(0, space));
+    });
+  }
 
   public List<Building> buildings(Collection<String> regionCodes) {
     if (regionCodes == null || regionCodes.isEmpty()) return jdbc.query(BUILDING_SQL, JdbcCatalog::building);

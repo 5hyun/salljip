@@ -3,45 +3,31 @@ package com.housinglab.api.scenario;
 import static com.housinglab.api.catalog.CatalogModels.*;
 import static com.housinglab.api.scenario.HistoricalSearchModels.*;
 
-import com.housinglab.api.catalog.DemoCatalog;
 import com.housinglab.api.catalog.JdbcCatalog;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 @Service
 public class HistoricalSearchService {
   private static final String VERSION = "historical-options-1.0.0";
-  private final DemoCatalog catalog;
-  /** 실데이터 모드(housing-lab.demo-mode=false)에서만 존재한다. */
-  private final JdbcCatalog realCatalog;
+  private final JdbcCatalog catalog;
 
-  public HistoricalSearchService(DemoCatalog catalog, Optional<JdbcCatalog> realCatalog) {
+  public HistoricalSearchService(JdbcCatalog catalog) {
     this.catalog = catalog;
-    this.realCatalog = realCatalog.orElse(null);
   }
 
   public Response search(Request request) {
     validate(request);
     long budget = Math.addExact(request.equityKrw(), request.assumedLoanKrw());
-    var buildings = realCatalog != null
-        ? realCatalog.buildings(request.regionCodes())
-        : catalog.buildings().stream().filter(building -> request.regionCodes().contains(building.regionCode())).toList();
-    var sales = realCatalog != null
-        ? realCatalog.sales(request.regionCodes(), request.period().from(), request.areaM2().min(), request.areaM2().max())
-        : catalog.trades().stream()
-            .filter(trade -> !trade.canceled() && "SALE".equals(trade.transactionType()))
-            .filter(trade -> !trade.contractDate().isBefore(request.period().from()))
-            .filter(trade -> withinArea(trade.areaM2(), request.areaM2()))
-            .toList();
+    var buildings = catalog.buildings(request.regionCodes());
+    var sales = catalog.sales(request.regionCodes(), request.period().from(), request.areaM2().min(), request.areaM2().max());
     // 과거 기간 시작 이후의 유사면적 매매를 한 번에 읽어 건물별로 묶는다(실데이터는 수만 건).
     Map<String, List<Trade>> salesByBuilding = sales.stream()
         .sorted(Comparator.comparingLong(Trade::priceKrw))
@@ -78,28 +64,20 @@ public class HistoricalSearchService {
         (int) changes.stream().filter(value -> value.signum() < 0).count(),
         changes.isEmpty() ? BigDecimal.ZERO : changes.get(changes.size() / 2));
     var warnings = new ArrayList<String>();
-    warnings.add(realCatalog == null
-        ? "데모 데이터입니다. 실거래 관측은 당시 매물 존재나 대출 승인을 보장하지 않습니다."
-        : "국토교통부 신고 실거래 관측치입니다. 당시 매물 존재나 대출 승인을 보장하지 않습니다.");
+    warnings.add("국토교통부 신고 실거래 관측치입니다. 당시 매물 존재나 대출 승인을 보장하지 않습니다.");
     if (candidates.size() > limited.size()) warnings.add("조건에 맞는 " + candidates.size() + "곳 중 " + limited.size() + "곳만 표시합니다.");
     if (limited.isEmpty()) warnings.add("조건에 맞는 관측 거래가 없습니다. 기간·예산·면적을 넓혀 보세요.");
     return new Response(
         limited,
         Map.of("budgetKrw", budget, "acquisitionCostKrw", request.acquisitionCostKrw(), "loan", "사용자 입력 가정"),
-        realCatalog == null ? Instant.parse("2026-11-17T00:00:00Z") : realCatalog.dataAsOf(),
-        realCatalog == null
-            ? List.of(Map.of("id", "MOLIT_DEMO", "name", "국토교통부 형식 합성 데이터", "status", "INTERNAL_TEST"))
-            : realCatalog.sources(),
+        catalog.dataAsOf(),
+        catalog.sources(),
         warnings, null, VERSION, distribution);
   }
 
   private void validate(Request request) {
     if (request.period().from().isAfter(request.period().to())) throw new IllegalArgumentException("시작일은 종료일보다 앞서야 합니다.");
     if (request.areaM2().min().compareTo(request.areaM2().max()) > 0) throw new IllegalArgumentException("최소 면적은 최대 면적보다 작아야 합니다.");
-  }
-
-  private boolean withinArea(BigDecimal area, Area range) {
-    return area.compareTo(range.min()) >= 0 && area.compareTo(range.max()) <= 0;
   }
 
   private PriceRange range(List<Trade> trades) {
