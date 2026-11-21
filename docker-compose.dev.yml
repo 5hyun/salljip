@@ -1,0 +1,9 @@
+# 맥 로컬 개발 전용: API를 Docker 밖에서 실행할 때 db 포트를 맥(127.0.0.1)에 노출한다.
+# 기본 compose의 backend 네트워크는 internal 이라 ports 설정이 적용되지 않기 때문에
+# 외부 접근이 가능한 네트워크를 하나 더 붙인다. 홈서버 배포에서는 사용하지 않는다.
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db
+services:
+  db:
+    networks: [backend, devhost]
+networks:
+  devhost:

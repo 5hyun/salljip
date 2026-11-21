@@ -22,6 +22,20 @@
 
 ## 실행
 
+### 로컬 개발 (맥): DB만 Docker, API·웹은 직접 실행
+
+Docker Desktop을 켠 뒤 터미널 3개에서 각각 실행합니다.
+
+```bash
+npm run dev:db    # PostGIS 컨테이너만 (localhost:15432)
+npm run dev:api   # Spring Boot bootRun (localhost:18080, 루트 .env의 API 키 사용)
+npm run dev:web   # Next.js dev 서버 (localhost:3000, apps/web/.env.local 사용)
+```
+
+`dev:db`는 `docker-compose.dev.yml`을 함께 적용해 db 포트를 `127.0.0.1:15432`로 엽니다(기본 compose의 backend 네트워크는 internal이라 포트가 노출되지 않음). `scripts/dev-api.sh`가 루트 `.env`를 읽은 뒤 DB 주소만 `localhost:15432`로 바꿔 API를 띄웁니다. 웹 코드는 저장 즉시 반영되고, API는 재시작하면 반영됩니다. DB 종료는 `docker compose stop db`입니다.
+
+### 전체 Docker (홈서버 배포와 동일)
+
 ```bash
 cp .env.example .env
 docker compose up --build
