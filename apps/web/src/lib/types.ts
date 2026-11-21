@@ -57,3 +57,38 @@ export type MapViewport = {
   zoom:number;
   center:[number,number];
 };
+
+export type UsageProvider = {
+  id:string;
+  label:string;
+  consoleUrl:string;
+  dailyLimit:number;
+};
+
+export type DailyUsage = {
+  source:string;
+  provider:string;
+  date:string;
+  calls:number;
+  errors:number;
+};
+
+export type SyncAttempt = {
+  attemptedAt:string;
+  manual:boolean;
+  success:boolean;
+  message:string|null;
+};
+
+export type UsageReport = {
+  source:string;
+  providers:UsageProvider[];
+  sync:{
+    sender:boolean;
+    target:string|null;
+    schedule:string|null;
+    lastAttempt:SyncAttempt|null;
+    received:{source:string;receivedAt:string;rowCount:number}[];
+  };
+  days:DailyUsage[];
+};

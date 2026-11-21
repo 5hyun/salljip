@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { reportMapLoad } from "@/lib/api";
 import type { MapMarkerItem, MapMode, MapStyleId, MapViewport } from "@/lib/types";
 
 const NAVER_MAP_SCRIPT_ID = "naver-map-sdk";
@@ -171,6 +172,7 @@ export default function RealEstateMap({
       }
       setMapReady(true);
       setLoadError(null);
+      reportMapLoad();
       reportViewport();
     }).catch(() => {
       if (!disposed) setLoadError("네이버 지도 인증에 실패했습니다. Dynamic Map 설정과 허용 URL을 확인해 주세요.");
