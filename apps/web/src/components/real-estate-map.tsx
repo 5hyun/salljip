@@ -5,7 +5,9 @@ import type { MapMarkerItem, MapMode, MapStyleId, MapViewport } from "@/lib/type
 
 const NAVER_MAP_SCRIPT_ID = "naver-map-sdk";
 const NAVER_MAP_CLIENT_ID = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID;
-const INITIAL_ZOOM = 13;
+const INITIAL_ZOOM = 16;
+// 첫 화면은 상계주공12단지(동일로 1538)를 중심으로 연다.
+const INITIAL_CENTER = { lat: 37.6673, lng: 127.0607 };
 const CLUSTER_ZOOM = 11.5;
 // "none" 이면 네이버 SDK를 아예 불러오지 않는다(개발·테스트에서 Dynamic Map 이용량 절약).
 const MAP_PROVIDER = process.env.NEXT_PUBLIC_MAP_PROVIDER === "none" ? "none" : "naver";
@@ -14,7 +16,7 @@ const AUTOMATED_AGENT = /bot|crawler|spider|crawling|headless|lighthouse/i;
 const FALLBACK_VIEWPORT: MapViewport = {
   bbox: "127.035,37.605,127.105,37.69",
   zoom: INITIAL_ZOOM,
-  center: [127.066, 37.648],
+  center: [INITIAL_CENTER.lng, INITIAL_CENTER.lat],
 };
 let naverMapLoader: Promise<void> | null = null;
 
@@ -134,7 +136,7 @@ export default function RealEstateMap({
       if (disposed || !containerRef.current) return;
       const map = new naver.maps.Map(containerRef.current, {
         gl: true,
-        center: new naver.maps.LatLng(37.648, 127.066),
+        center: new naver.maps.LatLng(INITIAL_CENTER.lat, INITIAL_CENTER.lng),
         zoom: INITIAL_ZOOM,
         minZoom: 9,
         maxZoom: 20,
@@ -147,6 +149,9 @@ export default function RealEstateMap({
       const reportViewport = () => {
         const bounds = map.getBounds() as naver.maps.LatLngBounds;
         const center = map.getCenter() as naver.maps.LatLng;
+        if (process.env.NODE_ENV !== "production") {
+          console.log(`[map] zoom=${map.getZoom()} center=${center.lat().toFixed(6)},${center.lng().toFixed(6)}`);
+        }
         onViewportChangeRef.current({
           bbox: [bounds.west(), bounds.south(), bounds.east(), bounds.north()].join(","),
           zoom: map.getZoom(),
